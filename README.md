@@ -9,8 +9,9 @@ education.
 Prejudice contains if you ask for a list of your lessons today).
 - **Community-driven** – this isn't the plaything of a venture capitalist. This is free (as in
 freedom) software that anyone can contribute to, modify and run.
-- **Accessible** – the platform is designed to be usable by everyone. We're working to try and
-
+- **Accessible** – the platform is designed to be usable by everyone. We're constantly working to
+find new ways to accomodate people. If you can think of a way to make something more usable (or if
+something confuses you) – we'd love to hear it!
 
 ## Contributions
 

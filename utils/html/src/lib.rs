@@ -20,10 +20,23 @@ macro_rules! heading_display {
     };
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Html {
+    status: u16,
+    reason: Option<&'static str>,
     head: Head,
     body: Body,
+}
+
+impl Default for Html {
+    fn default() -> Self {
+        Self {
+            status: 200,
+            reason: None,
+            head: Head::default(),
+            body: Body::default(),
+        }
+    }
 }
 
 impl Display for Html {
@@ -40,6 +53,7 @@ impl Display for Html {
 impl<'r> Responder<'r> for Html {
     fn respond_to(self, _: &rocket::Request) -> rocket::response::Result<'r> {
         Response::build()
+            .raw_status(self.status, self.reason.unwrap_or(""))
             .raw_header("Content-Type", "text/html")
             .sized_body(Cursor::new(self.to_string()))
             .ok()
@@ -55,6 +69,14 @@ impl Html {
         self.body = body;
         self
     }
+    pub fn status(mut self, code: u16) -> Self {
+        self.status = code;
+        self
+    }
+    pub fn status_reason(mut self, reason: &'static str) -> Self {
+        self.reason = Some(reason);
+        self
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -63,12 +85,19 @@ pub struct Head {
 }
 
 impl Head {
-    pub fn children(mut self, children: Vec<HeadNode>) -> Self {
-        self.children.extend(children);
+    pub fn children<C>(mut self, children: Vec<C>) -> Self
+    where
+        C: Into<HeadNode>,
+    {
+        self.children
+            .extend(children.into_iter().map(Into::into).collect::<Vec<_>>());
         self
     }
-    pub fn child(mut self, child: HeadNode) -> Self {
-        self.children.push(child);
+    pub fn child<C>(mut self, child: C) -> Self
+    where
+        C: Into<HeadNode>,
+    {
+        self.children.push(child.into());
         self
     }
 }
@@ -95,6 +124,7 @@ pub struct Meta {
 }
 
 impl Meta {
+    #[inline(always)]
     pub fn attribute(mut self, k: String, v: String) -> Self {
         self.attrs.push((k, v));
         self
@@ -145,12 +175,19 @@ pub struct Body {
 }
 
 impl Body {
-    pub fn children(mut self, children: Vec<BodyNode>) -> Self {
-        self.children.extend(children);
+    pub fn children<C>(mut self, children: Vec<C>) -> Self
+    where
+        C: Into<BodyNode>,
+    {
+        self.children
+            .extend(children.into_iter().map(Into::into).collect::<Vec<_>>());
         self
     }
-    pub fn child(mut self, child: BodyNode) -> Self {
-        self.children.push(child);
+    pub fn child<C>(mut self, child: C) -> Self
+    where
+        C: Into<BodyNode>,
+    {
+        self.children.push(child.into());
         self
     }
 }
@@ -189,6 +226,17 @@ pub enum BodyNode {
     H6(H6),
     P(P),
     Text(Text),
+    Form(Form),
+    Br(Br),
+}
+
+#[derive(Debug, Clone)]
+pub struct Br;
+
+impl Display for Br {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<br/>")
+    }
 }
 
 macro_rules! into_grouping_union {
@@ -201,10 +249,13 @@ macro_rules! into_grouping_union {
     };
 }
 
+into_grouping_union!(Br, BodyNode);
+into_grouping_union!(Br, FormNode);
+
 into_grouping_union!(Meta, HeadNode);
 into_grouping_union!(Title, HeadNode);
 
-enum_display!(BodyNode, H1, H2, H3, H4, H5, H6, P, Text);
+enum_display!(BodyNode, H1, H2, H3, H4, H5, H6, P, Br, Text, Form);
 
 #[derive(Default, Debug, Clone)]
 pub struct H1(pub String);
@@ -266,13 +317,23 @@ impl Display for P {
 }
 
 impl P {
-    pub fn children(mut self, children: Vec<BodyNode>) -> Self {
-        self.children.extend(children);
+    pub fn children<C>(mut self, children: Vec<C>) -> Self
+    where
+        C: Into<BodyNode>,
+    {
+        self.children
+            .extend(children.into_iter().map(Into::into).collect::<Vec<_>>());
         self
     }
-    pub fn child(mut self, child: BodyNode) -> Self {
-        self.children.push(child);
+    pub fn child<C>(mut self, child: C) -> Self
+    where
+        C: Into<BodyNode>,
+    {
+        self.children.push(child.into());
         self
+    }
+    pub fn with_text(text: String) -> Self {
+        P::default().child(BodyNode::Text(Text(text)))
     }
     pub fn text(self, text: String) -> Self {
         self.child(BodyNode::Text(Text(text)))
@@ -289,3 +350,99 @@ impl Display for Text {
         self.0.fmt(f)
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct Form {
+    children: Vec<FormNode>,
+    attrs: Vec<(String, String)>,
+}
+
+impl Form {
+    #[inline(always)]
+    pub fn children<C>(mut self, children: Vec<C>) -> Self
+    where
+        C: Into<FormNode>,
+    {
+        self.children
+            .extend(children.into_iter().map(Into::into).collect::<Vec<_>>());
+        self
+    }
+    #[inline(always)]
+    pub fn child<C>(mut self, child: C) -> Self
+    where
+        C: Into<FormNode>,
+    {
+        self.children.push(child.into());
+        self
+    }
+    #[inline(always)]
+    pub fn attribute(mut self, k: String, v: String) -> Self {
+        self.attrs.push((k, v));
+        self
+    }
+}
+
+impl Display for Form {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<form ")?;
+        for attr in &self.attrs {
+            f.write_str(" ")?;
+            attr.0.fmt(f)?;
+            f.write_str("=\"")?;
+            attr.1.fmt(f)?;
+            f.write_str("\"")?;
+        }
+        f.write_str(">")?;
+        for node in &self.children {
+            node.fmt(f)?;
+        }
+        f.write_str("</form>")
+    }
+}
+
+into_grouping_union!(Form, BodyNode);
+
+#[derive(Debug, Clone)]
+pub enum FormNode {
+    Input(Input),
+    Label(Label),
+    Br(Br),
+}
+
+enum_display!(FormNode, Input, Label, Br);
+
+#[derive(Debug, Clone, Default)]
+pub struct Input {
+    attrs: Vec<(String, String)>,
+}
+
+impl Display for Input {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<input")?;
+        for attr in &self.attrs {
+            f.write_str(" ")?;
+            attr.0.fmt(f)?;
+            f.write_str("=\"")?;
+            attr.1.fmt(f)?;
+            f.write_str("\"")?;
+        }
+        f.write_str("/>")
+    }
+}
+
+into_grouping_union!(Input, FormNode);
+
+impl Input {
+    #[inline(always)]
+    pub fn attribute(mut self, k: String, v: String) -> Self {
+        self.attrs.push((k, v));
+        self
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Label(pub String);
+
+heading_display!(Label);
+
+into_grouping_union!(Label, FormNode);

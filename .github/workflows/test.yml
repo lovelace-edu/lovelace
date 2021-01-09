@@ -1,0 +1,85 @@
+
+name: Test
+
+on:
+  push:
+    branches:
+      - staging
+      - trying
+      - main
+    pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache cargo registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Lint
+        run: cargo clippy -- -D warnings
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+        - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - run: sudo apt install postgresql postgresql-contrib 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast
+        env:
+          CARGO_INCREMENTAL: '0'
+          RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests'
+          DATABASE_URL: postgres://postgres:postgres@localhost/postgres
+      - uses: actions-rs/grcov@v0.1
+        with:
+          config: ./grcov.yml
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage.txt
+  bors-report:
+    if: ${{ always() && github.event_name == 'push' && contains('refs/heads/staging refs/heads/trying', github.ref) }}
+    needs:
+    - lint
+    - test
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check
+      run: |
+        [ ${{ needs.lint.result }} == success ] && [ ${{ needs.test.result }} == success ] || exit 1
