@@ -24,7 +24,7 @@ impl IntoVNode for Meta {
     fn into(self) -> yew::virtual_dom::VNode {
         let mut vtag = yew::virtual_dom::VTag::new("meta");
         for (a, b) in self.attrs {
-            vtag.add_attribute(a, b.to_string())
+            vtag.add_attribute(a, &b.to_string())
         }
         vtag.into()
     }
@@ -45,3 +45,18 @@ impl Display for Meta {
 }
 
 into_grouping_union!(Meta, HeadNode);
+
+#[cfg(test)]
+mod test {
+    use crate::prelude::*;
+    #[test]
+    fn test_a_with_attributes() {
+        let document = Meta::default()
+            .attribute("lang", "some-language")
+            .to_string();
+        let document = scraper::Html::parse_document(&document);
+        let a = scraper::Selector::parse("meta").unwrap();
+        let a = document.select(&a).next().unwrap().value();
+        assert_eq!(a.attr("lang").unwrap(), "some-language");
+    }
+}
