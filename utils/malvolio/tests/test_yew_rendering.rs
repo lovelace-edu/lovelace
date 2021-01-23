@@ -64,7 +64,7 @@ mod test {
     fn test_form_rendering() {
         use yew::prelude::*;
 
-        component_named_app_with_html!(Form::default()
+        component_named_app_with_html!(Form::new()
             .attribute(Method::Post)
             .child(
                 Input::default()
@@ -130,8 +130,8 @@ mod test {
         component_named_app_with_html!(Div::new()
             .child(
                 H1::new("Heading 1")
-                    .attribute("id", "heading1-1")
-                    .attribute("class", "some-class")
+                    .attribute(Id::new("heading1-1"))
+                    .attribute(Class::from("some-class"))
             )
             .to_html());
         yew::initialize();

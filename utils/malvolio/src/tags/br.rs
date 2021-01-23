@@ -1,12 +1,25 @@
 use std::fmt::Display;
 
-use crate::into_grouping_union_without_lifetimes;
 #[cfg(feature = "with_yew")]
 use crate::into_vnode::IntoVNode;
+use crate::{into_grouping_union_without_lifetimes, to_html};
 
 use super::body::body_node::BodyNode;
 #[derive(Debug, Clone)]
+/// A new line.
+///
+/// ```
+/// # use malvolio::prelude::*;
+/// Div::new().child(Br);
+/// ```
+///
+/// See the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/br) for more
+/// info.
 pub struct Br;
+
+impl Br {
+    to_html!();
+}
 
 impl Display for Br {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
