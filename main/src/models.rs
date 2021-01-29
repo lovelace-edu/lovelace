@@ -183,7 +183,7 @@ impl<'a> NewNotification<'a> {
     }
 }
 
-#[derive(Queryable, Identifiable, Associations)]
+#[derive(Queryable, Identifiable, Associations, Debug)]
 #[belongs_to(Class)]
 #[table_name = "class_message"]
 pub struct ClassMessage {
@@ -196,7 +196,7 @@ pub struct ClassMessage {
     pub edited: bool,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[table_name = "class_message"]
 pub struct NewClassMessage<'a> {
     pub title: &'a str,
@@ -207,7 +207,7 @@ pub struct NewClassMessage<'a> {
     pub edited: bool,
 }
 
-#[derive(Queryable, Identifiable, Associations)]
+#[derive(Queryable, Identifiable, Associations, Debug)]
 #[table_name = "class_message_reply"]
 #[belongs_to(User)]
 #[belongs_to(ClassMessage)]
@@ -221,7 +221,7 @@ pub struct ClassMessageReply {
     pub class_message_id: i32,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug)]
 #[table_name = "class_message_reply"]
 pub struct NewClassMessageReply<'a> {
     pub contents: &'a str,
@@ -254,7 +254,7 @@ impl ClassAsynchronousTask {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug, Clone)]
 #[table_name = "class_asynchronous_task"]
 pub struct NewClassAsynchronousTask<'a> {
     pub title: &'a str,
@@ -265,7 +265,7 @@ pub struct NewClassAsynchronousTask<'a> {
     pub class_id: i32,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug, Clone)]
 #[table_name = "student_class_asynchronous_task"]
 pub struct NewStudentClassAsynchronousTask {
     pub class_student_id: i32,
@@ -273,7 +273,7 @@ pub struct NewStudentClassAsynchronousTask {
     pub completed: bool,
 }
 
-#[derive(Queryable, Identifiable, Associations)]
+#[derive(Queryable, Identifiable, Associations, Debug)]
 #[table_name = "student_class_asynchronous_task"]
 #[belongs_to(ClassStudent)]
 #[belongs_to(ClassAsynchronousTask)]
@@ -307,7 +307,7 @@ impl ClassSynchronousTask {
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Clone, Debug)]
 #[table_name = "class_synchronous_task"]
 pub struct NewClassSynchronousTask<'a> {
     pub title: &'a str,
@@ -319,14 +319,14 @@ pub struct NewClassSynchronousTask<'a> {
     pub class_id: i32,
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Debug, Clone)]
 #[table_name = "student_class_synchronous_task"]
 pub struct NewStudentClassSynchronousTask {
     pub class_student_id: i32,
     pub class_synchronous_task_id: i32,
 }
 
-#[derive(Queryable, Identifiable, Associations)]
+#[derive(Queryable, Identifiable, Associations, Debug)]
 #[table_name = "student_class_synchronous_task"]
 #[belongs_to(ClassStudent)]
 #[belongs_to(ClassSynchronousTask)]
