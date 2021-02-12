@@ -62,25 +62,34 @@ pub struct CreateClassForm {
 }
 
 #[post("/class/create", data = "<form>")]
-pub fn create_class(form: Form<CreateClassForm>, cookie: AuthCookie, conn: Database) -> Html {
+pub async fn create_class(form: Form<CreateClassForm>, cookie: AuthCookie, conn: Database) -> Html {
     use crate::schema::class::dsl as class;
     use crate::schema::class_teacher::dsl as class_teacher;
-    match diesel::insert_into(class::class)
-        .values(NewClass::new(
-            &form.name,
-            &form.description,
-            Utc::now().naive_utc(),
-            &nanoid!(5),
-        ))
-        .get_result::<Class>(&*conn)
+    match conn
+        .run(move |c| {
+            diesel::insert_into(class::class)
+                .values(NewClass::new(
+                    &form.name,
+                    &form.description,
+                    Utc::now().naive_utc(),
+                    &nanoid!(5),
+                ))
+                .get_result::<Class>(c)
+        })
+        .await
     {
         Ok(res) => {
-            match diesel::insert_into(class_teacher::class_teacher)
-                .values(NewClassTeacher {
-                    user_id: cookie.0,
-                    class_id: res.id,
+            let res_id = res.id;
+            match conn
+                .run(move |c| {
+                    diesel::insert_into(class_teacher::class_teacher)
+                        .values(NewClassTeacher {
+                            user_id: cookie.0,
+                            class_id: res_id,
+                        })
+                        .execute(c)
                 })
-                .execute(&*conn)
+                .await
             {
                 Ok(_) => Html::default()
                     .head(default_head("Successfully created".to_string()))
@@ -89,7 +98,7 @@ pub fn create_class(form: Form<CreateClassForm>, cookie: AuthCookie, conn: Datab
                             .child(H1::new("This class has been sucessfully created"))
                             .child(
                                 A::default()
-                                    .attribute(Href::new(format!("/class/{}", res.id)))
+                                    .attribute(Href::new(format!("/class/{}", res_id)))
                                     .text("Click me to the class description.".to_string()),
                             ),
                     ),
@@ -123,11 +132,15 @@ pub fn create_class(form: Form<CreateClassForm>, cookie: AuthCookie, conn: Datab
 }
 
 #[get("/join/<join_code>")]
-pub fn join_class(join_code: String, user_id: AuthCookie, conn: Database) -> Html {
+pub async fn join_class(join_code: String, user_id: AuthCookie, conn: Database) -> Html {
     use crate::schema::class::dsl as class;
-    let class_id = match class::class
-        .filter(class::code.eq(join_code))
-        .first::<Class>(&*conn)
+    let class_id = match conn
+        .run(|c| {
+            class::class
+                .filter(class::code.eq(join_code))
+                .first::<Class>(c)
+        })
+        .await
     {
         Ok(t) => t,
         Err(diesel::result::Error::NotFound) => {
@@ -143,12 +156,16 @@ pub fn join_class(join_code: String, user_id: AuthCookie, conn: Database) -> Htm
             )
         }
     };
-    match diesel::insert_into(crate::schema::class_student::table)
-        .values(NewClassStudent {
-            user_id: user_id.0,
-            class_id: class_id.id,
+    match conn
+        .run(move |c| {
+            diesel::insert_into(crate::schema::class_student::table)
+                .values(NewClassStudent {
+                    user_id: user_id.0,
+                    class_id: class_id.id,
+                })
+                .get_result::<ClassStudent>(c)
         })
-        .get_result::<ClassStudent>(&*conn)
+        .await
     {
         Ok(_) => Html::default()
             .head(default_head("Joined".to_string()))
@@ -165,16 +182,20 @@ pub fn join_class(join_code: String, user_id: AuthCookie, conn: Database) -> Htm
 }
 
 #[get("/class")]
-pub fn view_all_classes(auth_cookie: AuthCookie, conn: Database) -> Html {
+pub async fn view_all_classes(auth_cookie: AuthCookie, conn: Database) -> Html {
     use crate::schema::class::dsl as class;
     use crate::schema::class_student::dsl as class_student;
     use crate::schema::class_teacher::dsl as class_teacher;
     let student_classes =
-        match class_student::class_student
-            .filter(class_student::user_id.eq(auth_cookie.0))
-            .inner_join(class::class)
-            .select(crate::schema::class::all_columns)
-            .load::<Class>(&*conn)
+        match conn
+            .run(move |c| {
+                class_student::class_student
+                    .filter(class_student::user_id.eq(auth_cookie.0))
+                    .inner_join(class::class)
+                    .select(crate::schema::class::all_columns)
+                    .load::<Class>(c)
+            })
+            .await
         {
             Ok(classes) => Div::new()
                 .attribute(malvolio::prelude::Class::from(LIST))
@@ -199,11 +220,15 @@ pub fn view_all_classes(auth_cookie: AuthCookie, conn: Database) -> Html {
                 "There was a database error loading this content.",
             )),
         };
-    let teacher_classes = match class_teacher::class_teacher
-        .filter(class_teacher::user_id.eq(auth_cookie.0))
-        .inner_join(class::class)
-        .select(crate::schema::class::all_columns)
-        .load::<Class>(&*conn)
+    let teacher_classes = match conn
+        .run(move |c| {
+            class_teacher::class_teacher
+                .filter(class_teacher::user_id.eq(auth_cookie.0))
+                .inner_join(class::class)
+                .select(crate::schema::class::all_columns)
+                .load::<Class>(c)
+        })
+        .await
     {
         Ok(classes) => Div::new()
             .attribute(malvolio::prelude::Class::from(LIST))
@@ -239,11 +264,11 @@ pub fn view_all_classes(auth_cookie: AuthCookie, conn: Database) -> Html {
 }
 
 #[get("/class/<id>")]
-pub fn view_class_overview(id: usize, auth_cookie: AuthCookie, conn: Database) -> Html {
-    match get_user_role_in_class(auth_cookie.0 as i32, id as i32, &conn) {
+pub async fn view_class_overview(id: usize, auth_cookie: AuthCookie, conn: Database) -> Html {
+    match get_user_role_in_class(auth_cookie.0 as i32, id as i32, &conn).await {
         Some(role) => match role {
             ClassMemberRole::Student => {
-                let class = Class::with_id(id as i32, conn).unwrap();
+                let class = Class::with_id(id as i32, &conn).await.unwrap();
                 Html::default()
                     .head(default_head(class.name.to_string()))
                     .body(
@@ -253,7 +278,7 @@ pub fn view_class_overview(id: usize, auth_cookie: AuthCookie, conn: Database) -
                     )
             }
             ClassMemberRole::Teacher => {
-                let class = Class::with_id(id as i32, conn).unwrap();
+                let class = Class::with_id(id as i32, &conn).await.unwrap();
                 Html::default().head(default_head(class.name.clone())).body(
                     Body::default()
                         .child(H1::new(format!("Class: {}", class.name)))
@@ -284,8 +309,8 @@ pub fn view_class_overview(id: usize, auth_cookie: AuthCookie, conn: Database) -
 }
 
 #[get("/class/<id>/settings")]
-pub fn get_class_settings(id: usize, auth_cookie: AuthCookie, conn: Database) -> Html {
-    if get_user_role_in_class(auth_cookie.0 as i32, id as i32, &*conn)
+pub async fn get_class_settings(id: usize, auth_cookie: AuthCookie, conn: Database) -> Html {
+    if get_user_role_in_class(auth_cookie.0 as i32, id as i32, &conn).await
         == Some(ClassMemberRole::Teacher)
     {
         Html::default()
@@ -314,30 +339,35 @@ pub enum ClassMemberRole {
 }
 
 /// Returns the role that a given user has in a given class.
-pub fn get_user_role_in_class(
+pub async fn get_user_role_in_class(
     user: i32,
     class: i32,
-    conn: &DatabaseConnection,
+    conn: &Database,
 ) -> Option<ClassMemberRole> {
     use crate::schema::class_student::dsl as class_student;
     use crate::schema::class_teacher::dsl as class_teacher;
-    if diesel::dsl::select(diesel::dsl::exists(
-        class_student::class_student
-            .filter(class_student::user_id.eq(user))
-            .filter(class_student::class_id.eq(class)),
-    ))
-    .get_result(conn)
-    .unwrap()
-    {
+    let if_condition = conn
+        .run(move |c| {
+            diesel::dsl::select(diesel::dsl::exists(
+                class_student::class_student
+                    .filter(class_student::user_id.eq(user))
+                    .filter(class_student::class_id.eq(class)),
+            ))
+            .get_result(c)
+        })
+        .await
+        .unwrap();
+    let else_if_condition = conn.run(move |c| {
+        diesel::dsl::select(diesel::dsl::exists(
+            class_teacher::class_teacher
+                .filter(class_teacher::user_id.eq(user))
+                .filter(class_teacher::class_id.eq(class)),
+        ))
+        .get_result(c)
+    });
+    if if_condition {
         Some(ClassMemberRole::Student)
-    } else if diesel::dsl::select(diesel::dsl::exists(
-        class_teacher::class_teacher
-            .filter(class_teacher::user_id.eq(user))
-            .filter(class_teacher::class_id.eq(class)),
-    ))
-    .get_result(conn)
-    .unwrap()
-    {
+    } else if else_if_condition.await.unwrap() {
         Some(ClassMemberRole::Teacher)
     } else {
         None
@@ -345,21 +375,28 @@ pub fn get_user_role_in_class(
 }
 
 #[get("/class/<id>/members")]
-pub fn view_class_members_page(id: usize, conn: Database, auth_cookie: AuthCookie) -> Html {
+pub async fn view_class_members_page(id: usize, conn: Database, auth_cookie: AuthCookie) -> Html {
     use crate::schema::class::dsl as class;
     use crate::schema::class_student::dsl as class_student;
     use crate::schema::users::dsl as users;
-    if get_user_role_in_class(auth_cookie.0 as i32, id as i32, &*conn).is_none() {
+    if get_user_role_in_class(auth_cookie.0 as i32, id as i32, &conn)
+        .await
+        .is_none()
+    {
         return error_message(
             "You don't have permission to view this class.".to_string(),
             "You might need to ask your teacher for a code to join the class.".to_string(),
         );
     };
-    let students = class::class
-        .filter(class::id.eq(id as i32))
-        .inner_join(class_student::class_student.inner_join(users::users))
-        .select(crate::schema::users::all_columns)
-        .load::<User>(&*conn)
+    let students = conn
+        .run(move |c| {
+            class::class
+                .filter(class::id.eq(id as i32))
+                .inner_join(class_student::class_student.inner_join(users::users))
+                .select(crate::schema::users::all_columns)
+                .load::<User>(c)
+        })
+        .await
         .map(|users| {
             users.into_iter().map(|user| {
                 Div::new()
@@ -368,11 +405,15 @@ pub fn view_class_members_page(id: usize, conn: Database, auth_cookie: AuthCooki
             })
         })
         .unwrap();
-    let teachers = class::class
-        .filter(class::id.eq(id as i32))
-        .inner_join(class_student::class_student.inner_join(users::users))
-        .select(crate::schema::users::all_columns)
-        .load::<User>(&*conn)
+    let teachers = conn
+        .run(move |c| {
+            class::class
+                .filter(class::id.eq(id as i32))
+                .inner_join(class_student::class_student.inner_join(users::users))
+                .select(crate::schema::users::all_columns)
+                .load::<User>(c)
+        })
+        .await
         .map(|users| {
             users.into_iter().map(|user| {
                 Div::new()
@@ -434,7 +475,7 @@ fn user_is_teacher(user_id: i32, class_id: i32, conn: &DatabaseConnection) -> bo
 }
 
 #[post("/class/<id>/invite/teacher", data = "<form>")]
-pub fn invite_teacher(
+pub async fn invite_teacher(
     id: usize,
     auth_cookie: AuthCookie,
     form: Form<InviteTeacherForm>,
@@ -442,7 +483,10 @@ pub fn invite_teacher(
 ) -> Html {
     use crate::schema::class_teacher_invite::dsl as class_teacher_invite;
     use crate::schema::users::dsl as users;
-    if !user_is_teacher(auth_cookie.0, id as i32, &*conn) {
+    if !conn
+        .run(move |c| user_is_teacher(auth_cookie.0, id as i32, c))
+        .await
+    {
         return Html::default().head(default_head("Permission denied".to_string())).body(
             Body::default()
                 .child(H1::new("Invite a new teacher"))
@@ -452,20 +496,28 @@ pub fn invite_teacher(
                 .child(invite_user_form()),
         );
     }
-    match users::users
-        .filter(users::username.eq(&form.identifier))
-        .or_filter(users::email.eq(&form.identifier))
-        .first::<User>(&*conn)
+    match conn
+        .run(move |c| {
+            users::users
+                .filter(users::username.eq(&form.identifier))
+                .or_filter(users::email.eq(&form.identifier))
+                .first::<User>(c)
+        })
+        .await
     {
         Ok(user) => {
-            match diesel::insert_into(class_teacher_invite::class_teacher_invite)
-                .values(NewClassTeacherInvite {
-                    inviting_user_id: auth_cookie.0,
-                    invited_user_id: user.id,
-                    class_id: id as i32,
-                    accepted: false,
+            match conn
+                .run(move |c| {
+                    diesel::insert_into(class_teacher_invite::class_teacher_invite)
+                        .values(NewClassTeacherInvite {
+                            inviting_user_id: auth_cookie.0,
+                            invited_user_id: user.id,
+                            class_id: id as i32,
+                            accepted: false,
+                        })
+                        .execute(c)
                 })
-                .execute(&*conn)
+                .await
             {
                 Ok(_) => Html::default()
                     .head(default_head("Header".to_string()))
@@ -537,19 +589,28 @@ pub struct DeleteClassForm {
 }
 
 #[post("/class/delete", data = "<form>")]
-pub fn delete_class(form: Form<DeleteClassForm>, auth_cookie: AuthCookie, conn: Database) -> Html {
+pub async fn delete_class(
+    form: Form<DeleteClassForm>,
+    auth_cookie: AuthCookie,
+    conn: Database,
+) -> Html {
     use crate::schema::class::dsl as class;
     use crate::schema::class_teacher::dsl as class_teacher;
-    let user_is_teacher = diesel::dsl::select(diesel::dsl::exists(
-        class_teacher::class_teacher
-            .filter(class_teacher::user_id.eq(auth_cookie.0 as i32))
-            .filter(class_teacher::class_id.eq(form.id)),
-    ))
-    .get_result::<bool>(&*conn)
-    .map_err(|e| {
-        error!("{:#?}", e);
-        e
-    });
+    let form_id = form.id;
+    let user_is_teacher = conn
+        .run(move |c| {
+            diesel::dsl::select(diesel::dsl::exists(
+                class_teacher::class_teacher
+                    .filter(class_teacher::user_id.eq(auth_cookie.0 as i32))
+                    .filter(class_teacher::class_id.eq(form_id)),
+            ))
+            .get_result::<bool>(c)
+        })
+        .await
+        .map_err(|e| {
+            error!("{:#?}", e);
+            e
+        });
     if let Ok(is_teacher) = user_is_teacher {
         if !is_teacher {
             return Html::default().head(default_head("Permission denied".to_string())).body(
@@ -573,12 +634,16 @@ pub fn delete_class(form: Form<DeleteClassForm>, auth_cookie: AuthCookie, conn: 
                     .child(delete_class_form(form.id as usize)),
             );
     }
-    match diesel::delete(
-        class::class
-            .filter(class::name.eq(&form.confirm_name))
-            .filter(class::id.eq(form.id)),
-    )
-    .execute(&*conn)
+    match conn
+        .run(move |c| {
+            diesel::delete(
+                class::class
+                    .filter(class::name.eq(&form.confirm_name))
+                    .filter(class::id.eq(form.id)),
+            )
+            .execute(c)
+        })
+        .await
     {
         Ok(num_deleted) => {
             if num_deleted == 0 {
@@ -590,7 +655,7 @@ pub fn delete_class(form: Form<DeleteClassForm>, auth_cookie: AuthCookie, conn: 
                             .child(P::with_text(
                                 "The name you've typed in doesn't match this class's name.",
                             ))
-                            .child(delete_class_form(form.id as usize)),
+                            .child(delete_class_form(form_id as usize)),
                     );
             }
             Html::default()
@@ -630,55 +695,65 @@ mod tests {
     const STUDENT_PASSWORD: &str = "stUD3NTP@SSW0RD";
     const CLASS_NAME: &str = "Some class name";
     const CLASS_DESCRIPTION: &str = "Some class description";
-    #[test]
-    fn test_class_handling() {
-        let client = crate::utils::client();
+
+    #[rocket::async_test]
+    async fn test_class_handling() {
+        let client = crate::utils::client().await;
         create_user(
             TEACHER_USERNAME,
             TEACHER_EMAIL,
             TIMEZONE,
             TEACHER_PASSWORD,
             &client,
-        );
+        )
+        .await;
         create_user(
             SECONDARY_TEACHER_USERNAME,
             SECONDARY_TEACHER_EMAIL,
             TIMEZONE,
             SECONDARY_TEACHER_PASSWORD,
             &client,
-        );
+        )
+        .await;
         create_user(
             STUDENT_USERNAME,
             STUDENT_EMAIL,
             TIMEZONE,
             STUDENT_PASSWORD,
             &client,
-        );
+        )
+        .await;
 
         // test can create class
-        login_user(TEACHER_USERNAME, TEACHER_PASSWORD, &client);
-        let mut create_class_res = client.get("/class/create").dispatch();
+        login_user(TEACHER_USERNAME, TEACHER_PASSWORD, &client).await;
+        let create_class_res = client.get("/class/create").dispatch().await;
         let string = create_class_res
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains("Create a class"));
 
-        let mut create_class_res = client
+        let create_class_res = client
             .post("/class/create")
             .header(ContentType::Form)
             .body(format!(
                 "name={}&description={}",
                 CLASS_NAME, CLASS_DESCRIPTION
             ))
-            .dispatch();
+            .dispatch()
+            .await;
         assert!(create_class_res
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response")
             .contains("Successfully created"));
 
         // test created class shows up on teacher class list
-        let mut get_class_list = client.get("/class").dispatch();
-        let string = get_class_list.body_string().expect("invalid body response");
+        let get_class_list = client.get("/class").dispatch().await;
+        let string = get_class_list
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(string.contains(CLASS_NAME));
 
         let id = Regex::new(r#"class/(?P<id>[0-9]+)"#)
@@ -693,9 +768,10 @@ mod tests {
 
         // test created class overview page can be seen
 
-        let mut class_overview_page = client.get(format!("/class/{}", id)).dispatch();
+        let class_overview_page = client.get(format!("/class/{}", id)).dispatch().await;
         let string = class_overview_page
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body string");
         assert!(string.contains(CLASS_NAME));
         assert!(string.contains(CLASS_DESCRIPTION));
@@ -710,106 +786,123 @@ mod tests {
 
         // test teacher can see settings page
 
-        let mut settings_page = client.get(format!("/class/{}/settings", id)).dispatch();
-        let string = settings_page.body_string().unwrap();
+        let settings_page = client
+            .get(format!("/class/{}/settings", id))
+            .dispatch()
+            .await;
+        let string = settings_page.into_string().await.unwrap();
         assert!(string.contains("delete"));
 
         // test students cannot join classes with the incorrect code
-        logout(&client);
+        logout(&client).await;
 
-        login_user(STUDENT_EMAIL, STUDENT_PASSWORD, &client);
+        login_user(STUDENT_EMAIL, STUDENT_PASSWORD, &client).await;
 
-        let mut invalid_join_attempt = client
+        let invalid_join_attempt = client
             .get("/join/SOME_RANDOM_CODE_WHICH_DOES_NOT_WORK+")
-            .dispatch();
-        let string = invalid_join_attempt.body_string().unwrap();
+            .dispatch()
+            .await;
+        let string = invalid_join_attempt.into_string().await.unwrap();
         assert!(string.contains("cannot be found"));
 
         // test students can join class
 
-        let mut valid_join_attempt = client.get(format!("/join/{}", join_code)).dispatch();
-        let string = valid_join_attempt.body_string().unwrap();
+        let valid_join_attempt = client.get(format!("/join/{}", join_code)).dispatch().await;
+        let string = valid_join_attempt.into_string().await.unwrap();
         assert!(string.contains("joined this class"));
 
         // test joined classes show up on student class list
 
-        let mut student_class_list = client.get("/class".to_string()).dispatch();
+        let student_class_list = client.get("/class".to_string()).dispatch().await;
         let string = student_class_list
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains(CLASS_NAME));
 
         // test students can see class overview page
 
-        let mut class_overview_page = client.get(format!("/class/{}", id)).dispatch();
+        let class_overview_page = client.get(format!("/class/{}", id)).dispatch().await;
         let string = class_overview_page
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains(CLASS_NAME));
         assert!(!string.contains("people to join"));
 
         // test teacher can delete class from the settings page
 
-        logout(&client);
+        logout(&client).await;
 
-        login_user(TEACHER_EMAIL, TEACHER_PASSWORD, &client);
+        login_user(TEACHER_EMAIL, TEACHER_PASSWORD, &client).await;
 
-        let mut delete_page = client.get(format!("/class/{}/delete", id)).dispatch();
-        let string = delete_page.body_string().expect("invalid body response");
+        let delete_page = client.get(format!("/class/{}/delete", id)).dispatch().await;
+        let string = delete_page
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(string.contains("Delete this class"));
 
         // test can't delete class without correct name
 
-        let mut invalid_delete_request = client
+        let invalid_delete_request = client
             .post("/class/delete".to_string())
             .header(ContentType::Form)
             .body(format!("id={}&confirm_name=wrong", id))
-            .dispatch();
+            .dispatch()
+            .await;
         let string = invalid_delete_request
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains("doesn't match"));
 
         // test can't delete class without correct class id
 
-        let mut invalid_delete_request = client
+        let invalid_delete_request = client
             .post("/class/delete".to_string())
             .header(ContentType::Form)
             .body(format!("id={}&confirm_name={}", 100000000, CLASS_NAME))
-            .dispatch();
+            .dispatch()
+            .await;
         let string = invalid_delete_request
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains("Permission denied"));
 
         // test teacher can delete class
 
-        let mut invalid_delete_request = client
+        let invalid_delete_request = client
             .post("/class/delete".to_string())
             .header(ContentType::Form)
             .body(format!("id={}&confirm_name={}", id, CLASS_NAME))
-            .dispatch();
+            .dispatch()
+            .await;
         let string = invalid_delete_request
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body response");
         assert!(string.contains("sucessfully deleted"));
 
         // test teacher can't see deleted classes
 
-        let mut class_overview_page = client.get(format!("/client/{}", id)).dispatch();
+        let class_overview_page = client.get(format!("/client/{}", id)).dispatch().await;
         let string = class_overview_page
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body string");
         assert!(!string.contains(CLASS_NAME));
         assert!(!string.contains(CLASS_DESCRIPTION));
 
         // test students can't see deleted classes
 
-        logout(&client);
-        login_user(STUDENT_EMAIL, STUDENT_PASSWORD, &client);
-        let mut class_overview_page = client.get(format!("/client/{}", id)).dispatch();
+        logout(&client).await;
+        login_user(STUDENT_EMAIL, STUDENT_PASSWORD, &client).await;
+        let class_overview_page = client.get(format!("/client/{}", id)).dispatch().await;
         let string = class_overview_page
-            .body_string()
+            .into_string()
+            .await
             .expect("invalid body string");
         assert!(!string.contains(CLASS_NAME));
         assert!(!string.contains(CLASS_DESCRIPTION));

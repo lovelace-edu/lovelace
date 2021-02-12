@@ -40,19 +40,18 @@ pub enum EmailSendError {
     NetworkError,
 }
 
+#[rocket::async_trait]
 pub trait SendMail {
     /// Sends an email
-    ///
-    /// After Rocket cuts a release with `async` support this method will be refactored to return a
-    /// future.
-    fn send(&self, email: &Email) -> Result<(), EmailSendError>;
+    async fn send(&self, email: &Email) -> Result<(), EmailSendError>;
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct SendgridMailSender {}
 
+#[rocket::async_trait]
 impl SendMail for SendgridMailSender {
-    fn send(&self, email: &Email) -> Result<(), EmailSendError> {
+    async fn send(&self, email: &Email) -> Result<(), EmailSendError> {
         let content = {
             let mut result = vec![];
             if let Some(text) = &email.plaintext {
@@ -89,19 +88,22 @@ impl SendMail for SendgridMailSender {
                 }
             }
         );
-        match ureq::post(&format!(
-            "{}/v3/mail/send",
-            std::env::var("SENDGRID_API_SERVER")
-                .unwrap_or_else(|_| "https://api.sendgrid.com".to_string())
-        ))
-        .set(
-            "Authorization",
-            &format!(
-                "Bearer: {}",
-                std::env::var("SENDGRID_API_KEY").expect("no sendgrid api key provided")
-            ),
-        )
-        .send_json(res)
+        match reqwest::Client::new()
+            .post(&format!(
+                "{}/v3/mail/send",
+                std::env::var("SENDGRID_API_SERVER")
+                    .unwrap_or_else(|_| "https://api.sendgrid.com".to_string())
+            ))
+            .header(
+                "Authorization",
+                &format!(
+                    "Bearer: {}",
+                    std::env::var("SENDGRID_API_KEY").expect("no sendgrid api key provided")
+                ),
+            )
+            .body(res.to_string())
+            .send()
+            .await
         {
             Ok(_) => Ok(()),
             Err(e) => {
@@ -124,7 +126,7 @@ mod tests {
     use super::{SendMail, SendgridMailSender};
     /// This test runs in a `tokio` runtime because it "mocks" HTTP requests (i.e. it catches HTTP
     /// requests, so that they are not actually dispatched to the internet.)
-    #[tokio::test]
+    #[rocket::async_test]
     async fn test_sendgrid_api_sends_correctly() {
         let mock_server = MockServer::start().await;
         std::env::set_var("SENDGRID_API_KEY", "SomeRandomAPIKey");
@@ -135,32 +137,34 @@ mod tests {
             .mount(&mock_server)
             .await;
         let mail_sender = SendgridMailSender::default();
-        let result = mail_sender.send(
-            &EmailBuilder::default()
-                .subject("Some dummy subject".to_string())
-                .plaintext(Some("Hello World!".to_string()))
-                .html_text(Some("<p>Hello World!</p>".to_string()))
-                .recipients(
-                    RecipientsBuilder::default()
-                        .recipients(vec![RecipientBuilder::default()
-                            .email("someone@example.com".to_string())
-                            .name("Someone".to_string())
+        let result = mail_sender
+            .send(
+                &EmailBuilder::default()
+                    .subject("Some dummy subject".to_string())
+                    .plaintext(Some("Hello World!".to_string()))
+                    .html_text(Some("<p>Hello World!</p>".to_string()))
+                    .recipients(
+                        RecipientsBuilder::default()
+                            .recipients(vec![RecipientBuilder::default()
+                                .email("someone@example.com".to_string())
+                                .name("Someone".to_string())
+                                .build()
+                                .unwrap()])
                             .build()
-                            .unwrap()])
-                        .build()
-                        .unwrap(),
-                )
-                .from((
-                    "Some dummy sender".to_string(),
-                    "dummy_sender@example.com".to_string(),
-                ))
-                .reply_to((
-                    "Some dummy sender".to_string(),
-                    "dummy_sender@example.com".to_string(),
-                ))
-                .build()
-                .unwrap(),
-        );
+                            .unwrap(),
+                    )
+                    .from((
+                        "Some dummy sender".to_string(),
+                        "dummy_sender@example.com".to_string(),
+                    ))
+                    .reply_to((
+                        "Some dummy sender".to_string(),
+                        "dummy_sender@example.com".to_string(),
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await;
         assert!(result.is_ok());
     }
 }

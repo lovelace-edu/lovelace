@@ -11,7 +11,8 @@ use malvolio::prelude::{
 };
 use regex::Regex;
 use rocket::{
-    http::{Cookie, Cookies, RawStr, Status},
+    http::{Cookie, CookieJar, RawStr},
+    outcome::IntoOutcome,
     request::{Form, FromRequest},
 };
 use std::str::FromStr;
@@ -28,49 +29,24 @@ use crate::{
 pub const LOGIN_COOKIE: &str = "AUTHORISED";
 
 #[derive(ThisError, Debug)]
-pub enum AuthError {
-    #[error("not logged in")]
-    NotLoggedIn,
-    #[error("invalid cookie state")]
-    InvalidCookieIssued,
-}
+pub enum AuthError {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct AuthCookie(pub i32);
 
-impl AuthCookie {
-    fn parse(c: Cookie) -> Result<Self, AuthError> {
-        let str = c.value();
-        match str.parse::<i32>() {
-            Ok(t) => Ok(Self(t)),
-            Err(_) => Err(AuthError::InvalidCookieIssued),
-        }
-    }
-}
-
-impl FromRequest<'_, '_> for AuthCookie {
+#[rocket::async_trait]
+impl<'a, 'r> FromRequest<'a, 'r> for AuthCookie {
     type Error = AuthError;
 
-    fn from_request(
-        request: &'_ rocket::Request<'_>,
+    async fn from_request(
+        request: &'a rocket::Request<'r>,
     ) -> rocket::request::Outcome<Self, Self::Error> {
-        match request
+        request
             .cookies()
             .get_private(LOGIN_COOKIE)
-            .map(AuthCookie::parse)
-        {
-            Some(e) => match e {
-                Ok(item) => rocket::request::Outcome::Success(item),
-                Err(e) => rocket::request::Outcome::Failure((
-                    Status::new(500, "Internal server error."),
-                    e,
-                )),
-            },
-            None => rocket::request::Outcome::Failure((
-                Status::new(400, "Not logged in."),
-                AuthError::NotLoggedIn,
-            )),
-        }
+            .and_then(|cookie| cookie.value().parse().ok())
+            .map(AuthCookie)
+            .or_forward(())
     }
 }
 
@@ -112,12 +88,17 @@ pub struct LoginData {
 }
 
 #[post("/login", data = "<data>")]
-pub fn login(mut cookies: Cookies, data: Form<LoginData>, conn: Database) -> Html {
+pub async fn login(cookies: &CookieJar<'_>, data: Form<LoginData>, conn: Database) -> Html {
     use schema::users::dsl::{email, username, users};
-    match users
-        .filter(username.eq(&data.identifier))
-        .or_filter(email.eq(&data.identifier))
-        .first::<User>(&*conn)
+    let closure_data = data.clone();
+    match conn
+        .run(move |c| {
+            users
+                .filter(username.eq(&closure_data.identifier))
+                .or_filter(email.eq(&closure_data.identifier))
+                .first::<User>(c)
+        })
+        .await
     {
         Ok(user) => {
             if verify(&data.password, &user.password)
@@ -134,6 +115,7 @@ pub fn login(mut cookies: Cookies, data: Form<LoginData>, conn: Database) -> Htm
                     )
             } else {
                 Html::default()
+                    .status(400)
                     .head(default_head("Error".to_string()))
                     .body(
                         Body::default()
@@ -145,6 +127,7 @@ pub fn login(mut cookies: Cookies, data: Form<LoginData>, conn: Database) -> Htm
         }
         Err(error) => match error {
             diesel::result::Error::NotFound => Html::default()
+                .status(404)
                 .head(default_head("Not found".to_string()))
                 .body(
                     Body::default()
@@ -156,13 +139,13 @@ pub fn login(mut cookies: Cookies, data: Form<LoginData>, conn: Database) -> Htm
                         .child(login_form()),
                 ),
             _ => Html::default()
+                .status(500)
                 .head(default_head("Unknown error".to_string()))
                 .body(
                     Body::default()
                         .child(H1::new("Database error"))
                         .child(P::with_text(
-                            "Something's up on our end. We're working to fix it as fast as
-                            we can!",
+                            "Something's up on our end. We're working to fix it as fast as we can!",
                         ))
                         .child(login_form()),
                 ),
@@ -236,7 +219,7 @@ lazy_static! {
 }
 
 #[post("/register", data = "<data>")]
-pub fn register(data: Form<RegisterData>, conn: Database, cookies: Cookies) -> Html {
+pub async fn register(data: Form<RegisterData>, conn: Database, cookies: &CookieJar<'_>) -> Html {
     use crate::schema::users::dsl::*;
     if cookies.get(LOGIN_COOKIE).is_some() {
         return Html::default()
@@ -296,16 +279,20 @@ pub fn register(data: Form<RegisterData>, conn: Database, cookies: Cookies) -> H
                 );
         }
     };
-    match insert_into(users)
-        .values(NewUser::new(
-            &data.username,
-            &data.email,
-            &hashed_password,
-            Utc::now().naive_utc(),
-            &chrono_timezone.to_string(),
-        ))
-        .returning(crate::schema::users::all_columns)
-        .get_result::<User>(&*conn)
+    match conn
+        .run(move |c| {
+            insert_into(users)
+                .values(NewUser::new(
+                    &data.username,
+                    &data.email,
+                    &hashed_password,
+                    Utc::now().naive_utc(),
+                    &chrono_timezone.to_string(),
+                ))
+                .returning(crate::schema::users::all_columns)
+                .get_result::<User>(c)
+        })
+        .await
     {
         Ok(user) => {
             let email_verification_link = format!(
@@ -359,6 +346,7 @@ pub fn register(data: Form<RegisterData>, conn: Database, cookies: Cookies) -> H
                         .build()
                         .unwrap(),
                 )
+                .await
                 .expect("fatal: failed to send verification email");
             Html::default()
                 .head(default_head("You have sucessfully registered!".to_string()))
@@ -401,7 +389,7 @@ pub fn register(data: Form<RegisterData>, conn: Database, cookies: Cookies) -> H
 }
 
 #[get("/logout")]
-pub fn logout(mut cookies: Cookies) -> Html {
+pub fn logout(cookies: &CookieJar<'_>) -> Html {
     if cookies.get_private(LOGIN_COOKIE).is_none() {
         return Html::default()
             .head(default_head("Cannot log you out.".to_string()))
@@ -422,7 +410,7 @@ pub struct EmailVerificationToken {
 }
 
 #[get("/verify?<code>")]
-pub fn verify_email(code: &RawStr, conn: Database) -> Html {
+pub async fn verify_email(code: &RawStr, conn: Database) -> Html {
     use crate::schema::users::dsl as users;
     match jwt::decode::<EmailVerificationToken>(
         code,
@@ -434,9 +422,13 @@ pub fn verify_email(code: &RawStr, conn: Database) -> Html {
         &jwt::Validation::default(),
     ) {
         Ok(code) => {
-            match diesel::update(users::users.filter(users::id.eq(code.claims.user_id)))
-                .set(users::email_verified.eq(true))
-                .execute(&*conn)
+            match conn
+                .run(move |c| {
+                    diesel::update(users::users.filter(users::id.eq(code.claims.user_id)))
+                        .set(users::email_verified.eq(true))
+                        .execute(c)
+                })
+                .await
             {
                 Ok(_) => Html::new()
                     .head(default_head("Email verified".to_string()))
@@ -466,9 +458,11 @@ mod test {
     /// This was chosen for no other reason than it is alphabetically first.
     const TIMEZONE: &str = "Africa/Abidjan";
 
+    use super::EmailVerificationToken;
     use crate::{
         db::Database,
         models::{NewUser, User},
+        utils::{client, login_user},
     };
     use diesel::prelude::*;
     use rocket::http::ContentType;
@@ -477,12 +471,10 @@ mod test {
         Mock, MockServer, ResponseTemplate,
     };
 
-    use super::{EmailVerificationToken, LOGIN_COOKIE};
-
-    #[test]
-    fn test_register_validation() {
-        let client = crate::utils::client();
-        let mut register_res = client
+    #[rocket::async_test]
+    async fn test_register_validation() {
+        let client = crate::utils::client().await;
+        let register_res = client
             .post("/auth/register")
             .header(ContentType::Form)
             .body(format!(
@@ -493,12 +485,16 @@ mod test {
                 "validPASSW0RD",
                 timezone = TIMEZONE
             ))
-            .dispatch();
-        let response = register_res.body_string().expect("invalid body response");
+            .dispatch()
+            .await;
+        let response = register_res
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(response.contains("Invalid email"));
     }
 
-    #[tokio::test]
+    #[rocket::async_test]
     async fn test_auth() {
         let mock_server = MockServer::start().await;
         std::env::set_var("SENDGRID_API_KEY", "SomeRandomAPIKey");
@@ -509,13 +505,18 @@ mod test {
             .expect(1..)
             .mount(&mock_server)
             .await;
-        let client = crate::utils::client();
+        let client = rocket::local::asynchronous::Client::tracked(crate::utils::launch())
+            .await
+            .unwrap();
         // check register page looks right
-        let mut register_page = client.get("/auth/register").dispatch();
-        let page = register_page.body_string().expect("invalid body response");
+        let register_page = client.get("/auth/register").dispatch().await;
+        let page = register_page
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(page.contains("Register"));
         // test can register
-        let mut register_res = client
+        let register_res = client
             .post("/auth/register")
             .header(ContentType::Form)
             .body(format!(
@@ -526,45 +527,46 @@ mod test {
                 password = PASSWORD,
                 timezone = TIMEZONE
             ))
-            .dispatch();
-        let response = register_res.body_string().expect("invalid body response");
+            .dispatch()
+            .await;
+        let response = register_res
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(response.contains("sucessfully registered"));
         // test login page looks right
-        let mut login_page = client.get("/auth/login").dispatch();
-        let page = login_page.body_string().expect("invalid body response");
+        let login_page = client.get("/auth/login").dispatch().await;
+        let page = login_page
+            .into_string()
+            .await
+            .expect("invalid body response");
         assert!(page.contains("Login"));
         // test can login
-        let mut login_res = client
-            .post("/auth/login")
-            .header(ContentType::Form)
-            .body(format!("identifier={}&password={}", USERNAME, PASSWORD))
-            .dispatch();
-        // check cookie set
-        login_res
-            .cookies()
-            .into_iter()
-            .find(|c| c.name() == LOGIN_COOKIE)
-            .unwrap();
-        let page = login_res.body_string().expect("invalid body response");
-        assert!(page.contains("now logged in"));
+        login_user(USERNAME, PASSWORD, &client).await;
     }
-    #[test]
-    fn test_email_verification() {
+    #[rocket::async_test]
+    async fn test_email_verification() {
         use crate::schema::users::dsl as users;
-        let client = crate::utils::client();
-        let user_id = diesel::insert_into(users::users)
-            .values(NewUser {
-                username: "some-username",
-                email: "email@example.com",
-                password: "123456@#rwefgGFD$TWe",
-                created: chrono::Utc::now().naive_utc(),
-                email_verified: false,
-                timezone: "Africa/Abidjan",
+        let client = client().await;
+        let user_id = Database::get_one(&client.rocket())
+            .await
+            .unwrap()
+            .run(|c| {
+                diesel::insert_into(users::users)
+                    .values(NewUser {
+                        username: "some-username",
+                        email: "email@example.com",
+                        password: "123456@#rwefgGFD$TWe",
+                        created: chrono::Utc::now().naive_utc(),
+                        email_verified: false,
+                        timezone: "Africa/Abidjan",
+                    })
+                    .returning(users::id)
+                    .get_result::<i32>(c)
+                    .unwrap()
             })
-            .returning(users::id)
-            .get_result::<i32>(&*Database::get_one(&client.rocket()).unwrap())
-            .unwrap();
-        let mut res = client
+            .await;
+        let res = client
             .get(format!(
                 "/auth/verify?code={}",
                 jwt::encode(
@@ -582,16 +584,23 @@ mod test {
                 )
                 .unwrap()
             ))
-            .dispatch();
-        let string = res.body_string().expect("invalid body response");
+            .dispatch()
+            .await;
+        let string = res.into_string().await.expect("invalid body response");
         assert!(string.contains("verified"));
         assert_eq!(
             {
-                users::users
-                    .filter(users::id.eq(user_id))
-                    .first::<User>(&*Database::get_one(&client.rocket()).unwrap())
+                Database::get_one(&client.rocket())
+                    .await
                     .unwrap()
-                    .email_verified
+                    .run(move |c| {
+                        users::users
+                            .filter(users::id.eq(user_id))
+                            .first::<User>(c)
+                            .unwrap()
+                            .email_verified
+                    })
+                    .await
             },
             true
         )

@@ -2,6 +2,18 @@
 This source code file is distributed subject to the terms of the GNU Affero General Public License.
 A copy of this license can be found in the `licenses` directory at the root of this project.
 */
+#[cfg(test)]
+use crate::auth::LOGIN_COOKIE;
+use crate::calendar::connect::gcal::StateValues;
+use malvolio::prelude::{Body, Head, Html, Title, H1, P};
+use rocket::figment::{
+    util::map,
+    value::{Map, Value},
+};
+use rocket::tokio::sync::RwLock;
+use rocket::{fairing::AdHoc, Rocket};
+#[cfg(test)]
+use rocket::{http::ContentType, local::asynchronous::Client};
 use std::collections::HashMap;
 
 pub mod auto_database_error;
@@ -10,19 +22,11 @@ pub mod html_or_redirect;
 pub mod permission_error;
 pub mod timezones;
 
-#[cfg(test)]
-use crate::auth::LOGIN_COOKIE;
-use malvolio::prelude::{Body, Head, Html, Title, H1, P};
-use rocket::{
-    config::{Environment, Value},
-    fairing::AdHoc,
-    Config, Rocket,
-};
-#[cfg(test)]
-use rocket::{http::ContentType, local::Client};
-
-pub fn default_head(title: String) -> Head {
-    Head::default().child(Title::new(title + " | Lovelace"))
+pub fn default_head<S>(title: S) -> Head
+where
+    S: Into<String>,
+{
+    Head::default().child(Title::new(title.into() + " | Lovelace"))
 }
 
 pub fn retrieve_database_url() -> String {
@@ -30,30 +34,41 @@ pub fn retrieve_database_url() -> String {
 }
 
 pub fn launch() -> Rocket {
-    let mut database_config = HashMap::new();
-    let mut databases = HashMap::new();
-    database_config.insert("url", Value::from(retrieve_database_url()));
-    databases.insert("postgres", Value::from(database_config));
-    let config = Config::build(
-        std::env::var("DEV")
-            .map(|_| Environment::Development)
-            .unwrap_or(Environment::Production),
-    )
-    .secret_key(
-        std::env::var("SECRET_KEY")
-            .unwrap_or_else(|_| "NNnXxqFeQ/1Sn8lh9MtlIW2uePR4TL/1O5dB2CPkTmg=".to_string()),
-    )
-    .keep_alive(0)
-    .port(
-        std::env::var("PORT")
-            .unwrap_or_else(|_| "5000".to_string())
-            .parse::<u16>()
-            .expect("invalid $PORT variable supplied"),
-    )
-    .extra("databases", databases)
-    .finalize()
-    .unwrap();
-    rocket::custom(config)
+    cfg_if! {
+        if #[cfg(test)] {
+            let db: Map<_, Value> = map! {
+                "url" => retrieve_database_url().into(),
+                // if the pool size is not one then some of the tests will open multiple connections
+                // which means that we run into problems (because we've configured each connection
+                // to never commit any data into the database and new connections therefore don't
+                // have the same state as the already created ones)
+                "pool_size" => 1.into()
+            };
+        } else {
+            let db: Map<_, Value> = map! {
+                "url" => retrieve_database_url().into()
+            };
+        }
+    }
+
+    let figment = rocket::Config::figment()
+        .merge(("databases", map!["postgres" => db]))
+        .merge((
+            "secret_key",
+            std::env::var("SECRET_KEY")
+                .unwrap_or_else(|_| "NNnXxqFeQ/1Sn8lh9MtlIW2uePR4TL/1O5dB2CPkTmg=".to_string()),
+        ))
+        .merge((
+            "port",
+            std::env::var("PORT")
+                .unwrap_or_else(|_| "5000".to_string())
+                .parse::<u16>()
+                .expect("invalid $PORT variable supplied"),
+        ));
+    rocket::custom(figment)
+        .manage(StateValues {
+            map: RwLock::new(HashMap::new()),
+        })
         .attach(crate::db::Database::fairing())
         .attach(AdHoc::on_attach(
             "Database Migrations",
@@ -123,6 +138,21 @@ pub fn launch() -> Rocket {
                 crate::class::tasks::synchronous::delete_task
             ],
         )
+        .mount(
+            "/calendar/gcal",
+            routes![
+                crate::calendar::connect::gcal::link_calendar,
+                crate::calendar::connect::gcal::link_gcal,
+                crate::calendar::connect::gcal::gcal_callback
+            ],
+        )
+        .mount(
+            "/calendar/unauthenticated_caldav",
+            routes![
+                crate::calendar::connect::unauthenticated_caldav::link_unauthenticated_caldav,
+                crate::calendar::connect::unauthenticated_caldav::view_link_unauthenticated_caldav
+            ],
+        )
 }
 
 pub fn error_message(title: String, message: String) -> Html {
@@ -134,49 +164,64 @@ pub fn error_message(title: String, message: String) -> Html {
 }
 
 #[cfg(test)]
-pub fn client() -> Client {
+pub async fn client() -> Client {
     let rocket = launch();
-    Client::new(rocket).expect("needs a valid rocket instance")
+    Client::tracked(rocket)
+        .await
+        .expect("needs a valid rocket instance")
 }
 
 #[cfg(test)]
-pub fn create_user(username: &str, email: &str, timezone: &str, password: &str, client: &Client) {
-    let mut register_res = client
+pub async fn create_user(
+    username: &str,
+    email: &str,
+    timezone: &str,
+    password: &str,
+    client: &Client,
+) {
+    let register_res = client
         .post("/auth/register")
         .header(ContentType::Form)
         .body(format!(
             "username={}&email={}&timezone={timezone}&password={password}&password_confirmation={password}",
             username, email, timezone=timezone, password=password
         ))
-        .dispatch();
+        .dispatch().await;
     assert!(register_res
-        .body_string()
+        .into_string()
+        .await
         .expect("invalid body response")
         .contains("Registration successful!"));
 }
 
 #[cfg(test)]
-pub fn login_user(identifier: &str, password: &str, client: &Client) {
-    let mut login_res = client
+pub async fn login_user(identifier: &str, password: &str, client: &Client) {
+    let login_res = client
         .post("/auth/login")
         .header(ContentType::Form)
         .body(format!("identifier={}&password={}", identifier, password))
-        .dispatch();
-    let string = login_res.body_string().expect("invalid body response");
-    assert!(string.contains("Logged in"));
+        .dispatch()
+        .await;
     login_res
         .cookies()
-        .into_iter()
+        .iter()
         .find(|c| c.name() == LOGIN_COOKIE)
         .unwrap();
+    let string = login_res
+        .into_string()
+        .await
+        .expect("invalid body response");
+    assert!(string.contains("Logged in"));
 }
 
 #[cfg(test)]
-pub fn logout(client: &Client) {
+pub async fn logout(client: &Client) {
     assert!(client
         .get("/logout")
         .dispatch()
-        .body_string()
+        .await
+        .into_string()
+        .await
         .unwrap()
         .contains("Logged out"));
 }

@@ -34,13 +34,22 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo apt install postgresql postgresql-contrib
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+      - name: Install CalDAV server
+        run: |
+          sudo apt install python3-dulwich python3-defusedxml python3-icalendar python3-jinja2
+          python -m pip install --upgrade xandikos
+      - run: (xandikos --defaults -d dav) & sleep 3 ; kill $!
+      - run: (cd dav/user/calendars && cp -r calendar lovelace)
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin --version 0.16.0
       - name: Generate code coverage
-        # this might seem like a long timeout but some of the tests can take quite long (they're
-        # blocking)
+        # this might seem like a long timeout but some of the tests can take quite long
         run: |
-          cargo +nightly tarpaulin --verbose --all --workspace --timeout 300 --out Xml
+          (xandikos --defaults -d dav) & (cargo +nightly tarpaulin --verbose --all --workspace --timeout 300 --out Xml)
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost/postgres
       - name: Upload to codecov.io
