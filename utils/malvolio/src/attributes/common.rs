@@ -7,6 +7,14 @@ use super::IntoAttribute;
 /// A builder for constructing values for the `class` attribute.
 pub struct Class(HashSet<Cow<'static, str>>);
 
+impl From<Cow<'static, str>> for Class {
+    fn from(str: Cow<'static, str>) -> Self {
+        let mut set = HashSet::new();
+        set.insert(str);
+        Self(set)
+    }
+}
+
 impl From<&'static str> for Class {
     fn from(str: &'static str) -> Self {
         let mut set = HashSet::new();
