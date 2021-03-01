@@ -76,6 +76,12 @@ macro_rules! impl_of_heading_new_fn {
                 self
             }
         }
+
+        impl From<&'static str> for $name {
+            fn from(string: &'static str) -> Self {
+                $name::new(string)
+            }
+        }
     };
 }
 
