@@ -123,3 +123,12 @@ where
         to_apply(self)
     }
 }
+
+/// This trait contains a constant called "CLASS" which allows access to the class name for this
+/// item. The `#[derive(CSS)]` macro will output this, if you enable the "classes=true" option.
+/// Note that if you do not enable that option, this trait will not be derived and you will get a
+/// compile error.
+pub trait ClassName {
+    /// The class name corresponding.
+    const CLASS: &'static str;
+}
