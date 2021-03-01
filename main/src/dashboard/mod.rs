@@ -4,7 +4,7 @@
 use diesel::prelude::*;
 use malvolio::prelude::*;
 use mercutio::Apply;
-use portia::{levels::Level, render::Render};
+use portia::{card::Card, levels::Level, render::Render};
 use rocket_contrib::json::Json;
 
 use crate::{
@@ -238,32 +238,44 @@ impl Render<Html> for Dashboard {
                     .child(
                         Level::new()
                             .child(H1::new("Upcoming synchronous tasks"))
-                            .children(self.sync_tasks.into_iter().map(|task| {
-                                Level::new()
-                                    .child(H3::new(format!("Task: {}", task.task.title)))
-                                    .child(P::with_text(format!(
-                                        "Description: {}",
-                                        task.task.description
-                                    )))
-                                    .child(P::with_text(format!(
-                                        "Start time: {}",
-                                        task.task.start_time.format("%Y-%m-%d %H:%M:%S")
-                                    )))
-                                    .child(P::with_text(format!(
-                                        "End time: {}",
-                                        task.task.end_time.format("%Y-%m-%d %H:%M:%S")
-                                    )))
-                                    .child(
-                                        A::new()
-                                            .attribute(Href::new(format!(
-                                                "/class/{}/task/sync/{}",
-                                                task.class.id, task.task.id
-                                            )))
-                                            .text("View more"),
-                                    )
-                            })),
+                            .children(
+                                self.sync_tasks
+                                    .into_iter()
+                                    .map(|task| SyncTaskCard(task).render()),
+                            ),
                     ),
             )
+    }
+}
+
+pub struct SyncTaskCard(pub SynchronousTask);
+
+impl Render<Div> for SyncTaskCard {
+    fn render(self) -> Div {
+        Card::new()
+            .title(self.0.task.title)
+            .contents(BodyNode::from(
+                Div::new()
+                    .child(P::with_text(format!(
+                        "Description: {}",
+                        self.0.task.description
+                    )))
+                    .child(P::with_text(format!(
+                        "Start time: {}",
+                        self.0.task.start_time.format("%Y-%m-%d %H:%M:%S")
+                    )))
+                    .child(P::with_text(format!(
+                        "End time: {}",
+                        self.0.task.end_time.format("%Y-%m-%d %H:%M:%S")
+                    ))),
+            ))
+            .action_bar(vec![A::new()
+                .attribute(Href::new(format!(
+                    "/class/{}/task/sync/{}",
+                    self.0.class.id, self.0.task.id
+                )))
+                .text("View more")])
+            .render()
     }
 }
 
