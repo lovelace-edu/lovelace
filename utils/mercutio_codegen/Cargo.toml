@@ -21,4 +21,4 @@ mercutio = { path = "../mercutio" }
 malvolio = { path = "../malvolio" }
 
 [features]
-no-cache = []
+no_cache = []
