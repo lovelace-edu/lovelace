@@ -1,13 +1,14 @@
-use std::fs::read_to_string;
-
 #[test]
 fn test_direct_apply() {
     let t = trybuild::TestCases::new();
     t.pass("tests/examples/pass.rs");
 }
 
+#[cfg(feature = "no_cache")]
 #[test]
 fn test_classes_to_file() {
+    use std::fs::read_to_string;
+
     let t = trybuild::TestCases::new();
     t.pass("tests/write_file/pass.rs");
     std::mem::drop(t);
