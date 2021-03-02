@@ -82,6 +82,7 @@ jobs:
       - run: (xandikos --defaults -d dav) & (cargo test --no-fail-fast --all --workspace)
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost/postgres
+          EMIT_FILE_LOCATION: 1
 
   test-malvolio-in-browser:
     runs-on: ubuntu-latest
