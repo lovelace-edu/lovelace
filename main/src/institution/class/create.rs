@@ -297,7 +297,7 @@ async fn apply_create_institution_class(
 pub async fn html_create_institution_class(
     conn: Database,
     auth: AuthCookie,
-    data: rocket::request::Form<CreateClassForm>,
+    data: rocket::form::Form<CreateClassForm>,
     institution_id: i32,
 ) -> HtmlOrRedirect {
     match apply_create_institution_class(conn, auth, &data, institution_id).await {

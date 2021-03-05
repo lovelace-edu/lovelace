@@ -48,7 +48,7 @@ pub struct Unauthenticated {
 
 #[post("/link", data = "<form>")]
 pub async fn link_unauthenticated_caldav(
-    form: rocket::request::Form<Unauthenticated>,
+    form: rocket::form::Form<Unauthenticated>,
     auth: AuthCookie,
     conn: Database,
 ) -> Html {

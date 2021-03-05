@@ -55,7 +55,7 @@ pub struct InviteTeacherForm {
 pub async fn html_invite_teacher(
     id: usize,
     auth_cookie: AuthCookie,
-    form: rocket::request::Form<InviteTeacherForm>,
+    form: rocket::form::Form<InviteTeacherForm>,
     conn: Database,
 ) -> Html {
     use crate::schema::class_teacher_invite::dsl as class_teacher_invite;
@@ -131,7 +131,7 @@ pub async fn html_invite_teacher(
 pub async fn api_invite_teacher(
     id: usize,
     auth_cookie: AuthCookie,
-    form: rocket::request::Form<InviteTeacherForm>,
+    form: rocket::form::Form<InviteTeacherForm>,
     conn: Database,
 ) -> Json<ApiResponse<()>> {
     use crate::schema::class_teacher_invite::dsl as class_teacher_invite;

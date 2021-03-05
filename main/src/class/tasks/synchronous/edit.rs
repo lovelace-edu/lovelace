@@ -183,7 +183,7 @@ pub async fn html_apply_edit_task(
     task_id: i32,
     auth: AuthCookie,
     conn: Database,
-    form: rocket::request::Form<EditTaskForm>,
+    form: rocket::form::Form<EditTaskForm>,
 ) -> Html {
     match apply_edit_task(class_id, task_id, auth, conn, &form).await {
         Ok(_) => Html::new()

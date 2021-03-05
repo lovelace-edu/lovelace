@@ -161,7 +161,7 @@ pub async fn html_apply_create_new_class_message(
     class_id: i32,
     auth: AuthCookie,
     conn: Database,
-    form: rocket::request::Form<CreateNewMessageForm>,
+    form: rocket::form::Form<CreateNewMessageForm>,
 ) -> HtmlOrRedirect {
     match create_new_class_message_base(class_id, auth, conn, &form).await {
         Ok(class_message) => HtmlOrRedirect::Redirect(Redirect::to(format!(

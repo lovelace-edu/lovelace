@@ -74,7 +74,7 @@ pub async fn html_reply_to_teacher_message(
     message_id: i32,
     auth: AuthCookie,
     conn: Database,
-    form: rocket::request::Form<ReplyToTeacherMessageForm>,
+    form: rocket::form::Form<ReplyToTeacherMessageForm>,
 ) -> HtmlOrRedirect {
     match add_reply_to_teacher_message_base(class_id, message_id, auth, conn, &form).await {
         Ok(_) => HtmlOrRedirect::Redirect(Redirect::to(format!(
@@ -94,7 +94,7 @@ pub async fn api_reply_to_teacher_message(
     message_id: i32,
     auth: AuthCookie,
     conn: Database,
-    form: rocket::request::Form<ReplyToTeacherMessageForm>,
+    form: rocket::form::Form<ReplyToTeacherMessageForm>,
 ) -> Json<ApiResponse<ClassMessageReply>> {
     Json(
         match add_reply_to_teacher_message_base(class_id, message_id, auth, conn, &form).await {

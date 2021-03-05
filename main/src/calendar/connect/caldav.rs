@@ -68,7 +68,7 @@ pub struct CaldavCalendarForm {
 #[post("/link", data = "<form>")]
 pub async fn connect_caldav_calendar(
     conn: Database,
-    form: rocket::request::Form<CaldavCalendarForm>,
+    form: rocket::form::Form<CaldavCalendarForm>,
     auth: AuthCookie,
 ) -> Html {
     use crate::schema::caldav;

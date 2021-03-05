@@ -104,7 +104,7 @@ async fn create_class(
 
 #[post("/class/create", data = "<form>")]
 pub async fn html_create_class(
-    form: rocket::request::Form<CreateClassForm>,
+    form: rocket::form::Form<CreateClassForm>,
     auth: AuthCookie,
     conn: Database,
 ) -> Html {

@@ -1,6 +1,5 @@
 use diesel::prelude::*;
 use malvolio::prelude::*;
-use rocket::http::RawStr;
 
 use crate::{
     db::Database,
@@ -14,7 +13,7 @@ pub struct EmailVerificationToken {
 }
 
 #[get("/verify?<code>")]
-pub async fn verify_email(code: &RawStr, conn: Database) -> Html {
+pub async fn verify_email(code: &str, conn: Database) -> Html {
     use crate::schema::users::dsl as users;
     match jwt::decode::<EmailVerificationToken>(
         code,

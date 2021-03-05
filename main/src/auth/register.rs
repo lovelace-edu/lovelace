@@ -222,7 +222,7 @@ pub async fn register_base(
 
 #[post("/register", data = "<data>")]
 pub async fn html_register(
-    data: rocket::request::Form<RegisterData>,
+    data: rocket::form::Form<RegisterData>,
     conn: Database,
     cookies: &CookieJar<'_>,
 ) -> Html {
@@ -319,7 +319,7 @@ pub async fn html_register(
 
 #[post("/register", data = "<data>")]
 pub async fn api_register(
-    data: rocket::request::Form<RegisterData>,
+    data: rocket::form::Form<RegisterData>,
     conn: Database,
     cookies: &CookieJar<'_>,
 ) -> Json<ApiResponse<User>> {

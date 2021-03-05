@@ -159,7 +159,7 @@ pub async fn html_configure_institution(
     institution_id: i32,
     conn: Database,
     auth: AuthCookie,
-    form: rocket::request::Form<ConfigureInstitutionForm>,
+    form: rocket::form::Form<ConfigureInstitutionForm>,
 ) -> Html {
     match apply_configure_institution(conn, &form, auth, institution_id).await {
         Ok(institution) => Html::new()
