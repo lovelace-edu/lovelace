@@ -18,8 +18,9 @@ love your input on what you would like to see in the "edtech" solutions of tomor
 - **Fast** (should be at least, let us know if you're experiencing issues!)
 - **No** crazy page load sizes (e.g. we won't send you the same amount of data as Pride and
 Prejudice contains if you ask for a list of your lessons today).
-- **Community-driven** – this isn't the plaything of a venture capitalist. This is free (as in
-freedom) software that anyone can contribute to, modify and run.
+- **Community-driven** – software should serve humans; humans shouldn't serve software! Please
+feel free to suggest ideas, concepts, problems (anything you think is a problem with the software
+is by definition a problem!)
 - **Accessible** – the platform is designed to be usable by everyone. We're constantly working to
 find new ways to accomodate people. If you can think of a way to make something more usable (or if
 something confuses you) – we'd love to hear it!
