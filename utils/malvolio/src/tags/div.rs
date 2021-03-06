@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use crate::{
     attributes::{common::Class, IntoAttribute},
-    prelude::Style,
+    prelude::{Style, H1, H2, H3, H4, H5, H6},
 };
 
 #[cfg(feature = "with_yew")]
@@ -112,6 +112,138 @@ impl Div {
         self.attrs.get(attribute)
     }
     to_html!();
+    /// Attach a new `H1` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h1("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H1::new("Hello World!"));
+    /// ```
+    pub fn h1<C>(self, c: C) -> Self
+    where
+        C: Into<H1>,
+    {
+        self.child(c.into())
+    }
+    /// Attach a new `H2` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h2("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H2::new("Hello World!"));
+    /// ```
+    pub fn h2<C>(self, c: C) -> Self
+    where
+        C: Into<H2>,
+    {
+        self.child(c.into())
+    }
+    /// Attach a new `H3` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h3("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H3::new("Hello World!"));
+    /// ```
+    pub fn h3<C>(self, c: C) -> Self
+    where
+        C: Into<H3>,
+    {
+        self.child(c.into())
+    }
+    /// Attach a new `H4` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h4("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H4::new("Hello World!"));
+    /// ```
+    pub fn h4<C>(self, c: C) -> Self
+    where
+        C: Into<H4>,
+    {
+        self.child(c.into())
+    }
+    /// Attach a new `H5` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h5("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H6::new("Hello World!"));
+    /// ```
+    pub fn h5<C>(self, c: C) -> Self
+    where
+        C: Into<H5>,
+    {
+        self.child(c.into())
+    }
+    /// Attach a new `H6` instance to this class. Note that this method only allows you to provide
+    /// text, and no additional attributes. If you want to specify extra attributes, you should
+    /// instead use the "child" method (see the documentation of that method for more details).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().h6("Hello World!");
+    /// ```
+    ///
+    /// This is just a convenience wrapper, and is functionally equivalent to calling the `child`
+    /// method (but somewhat more concise).
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// Body::new().child(H6::new("Hello World!"));
+    /// ```
+    pub fn h6<C>(self, c: C) -> Self
+    where
+        C: Into<H6>,
+    {
+        self.child(c.into())
+    }
 }
 
 impl Display for Div {
