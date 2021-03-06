@@ -107,7 +107,7 @@ impl A {
     /// Note: this method is a shortcut for
     /// ```rust
     /// # use malvolio::prelude::*;
-    /// A::new().attribute(Href::new("https://example.com"))
+    /// A::new().attribute(Href::new("https://example.com"));
     /// ```
     pub fn href<C>(self, href: C) -> Self
     where
@@ -119,12 +119,12 @@ impl A {
     /// Attach a new `id` attribute to this tag.
     ///
     /// ```rust
-    /// A::new().id("some-id")
+    /// A::new().id("some-id");
     /// ```
     ///
     /// Note: this method is a shortcut for
     /// ```rust
-    /// A::new().attribute(Id::new("some-id"))
+    /// A::new().attribute(Id::new("some-id"));
     /// ```
     pub fn id<C>(self, id: C) -> Self
     where
