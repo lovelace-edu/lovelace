@@ -128,7 +128,7 @@ pub async fn api_apply_message_edit(
     message_id: i32,
     conn: Database,
     auth: AuthCookie,
-    form: rocket::request::Form<EditMessageForm>,
+    form: rocket::form::Form<EditMessageForm>,
 ) -> Json<ApiResponse<ClassMessage>> {
     Json(
         match apply_message_edit_base(message_id, conn, auth, &form).await {
@@ -146,7 +146,7 @@ pub async fn html_apply_message_edit(
     message_id: i32,
     conn: Database,
     auth: AuthCookie,
-    form: rocket::request::Form<EditMessageForm>,
+    form: rocket::form::Form<EditMessageForm>,
 ) -> HtmlOrRedirect {
     match apply_message_edit_base(message_id, conn, auth, &form).await {
         Ok(_) => HtmlOrRedirect::Redirect(Redirect::to(format!(

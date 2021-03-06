@@ -99,7 +99,7 @@ async fn register_new_institution(
 #[post("/register", data = "<form>")]
 pub async fn html_register_new_institution(
     auth: AuthCookie,
-    form: rocket::request::Form<CreateNewInstitutionForm>,
+    form: rocket::form::Form<CreateNewInstitutionForm>,
     conn: Database,
 ) -> Html {
     match register_new_institution(auth, conn, &form).await {

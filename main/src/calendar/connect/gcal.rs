@@ -59,7 +59,7 @@ pub struct LinkCalendarForm {
 pub async fn link_calendar(
     auth: AuthCookie,
     oauth_state_values: State<'_, StateValues>,
-    form: rocket::request::Form<LinkCalendarForm>,
+    form: rocket::form::Form<LinkCalendarForm>,
 ) -> HtmlOrRedirect {
     let uuid = uuid::Uuid::new_v4().to_string();
 

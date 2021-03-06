@@ -149,7 +149,7 @@ pub async fn api_login(
 #[post("/login", data = "<data>")]
 pub async fn html_login(
     cookies: &CookieJar<'_>,
-    data: rocket::request::Form<LoginData>,
+    data: rocket::form::Form<LoginData>,
     conn: Database,
 ) -> Html {
     match login_base(cookies, &data, conn).await {

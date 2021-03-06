@@ -118,7 +118,7 @@ pub async fn html_apply_message_reply_edit(
     message_id: i32,
     conn: Database,
     auth: AuthCookie,
-    form: rocket::request::Form<ApplyMessageReplyEditForm>,
+    form: rocket::form::Form<ApplyMessageReplyEditForm>,
 ) -> HtmlOrRedirect {
     match apply_message_reply_edit_base(class_id, message_reply_id, conn, auth, &form).await {
         Ok(_) => HtmlOrRedirect::Redirect(Redirect::to(format!(

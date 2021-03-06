@@ -58,7 +58,7 @@ pub struct DeleteClassForm {
 
 #[post("/class/delete", data = "<form>")]
 pub async fn html_delete_class(
-    form: rocket::request::Form<DeleteClassForm>,
+    form: rocket::form::Form<DeleteClassForm>,
     auth_cookie: AuthCookie,
     conn: Database,
 ) -> Html {

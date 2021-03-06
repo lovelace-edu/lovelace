@@ -173,7 +173,7 @@ pub async fn html_create_new_async_task(
     conn: Database,
     class_id: i32,
     auth: AuthCookie,
-    form: rocket::request::Form<CreateNewAsyncTask>,
+    form: rocket::form::Form<CreateNewAsyncTask>,
 ) -> Html {
     match new_async_task(conn, class_id, auth, &form).await {
         Ok(_) => Html::new()
