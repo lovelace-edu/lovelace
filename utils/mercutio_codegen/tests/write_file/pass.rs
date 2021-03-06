@@ -9,4 +9,6 @@ use mercutio::*;
 )]
 pub struct TitleStyles;
 
-pub fn main() {}
+pub fn main() {
+    let _: &'static str = TitleStyles::CLASS;
+}

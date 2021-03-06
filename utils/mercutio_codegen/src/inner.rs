@@ -281,8 +281,16 @@ impl CssPropsInner {
                     }
                 }
             });
+            let class_name_impl = quote! {
+                impl ::mercutio::ClassName for #name {
+                    const CLASS: &'static str = #class_name;
+                }
+            };
             if let Some(file) = file {
                 let path = format!("{}{}", std::env::var("CARGO_MANIFEST_DIR").unwrap(), &file);
+                if std::env::var("EMIT_FILE_LOCATION").is_ok() {
+                    println!("Wrote file to: {}", path);
+                }
                 let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
@@ -291,10 +299,11 @@ impl CssPropsInner {
                 let string = read_to_string(path).unwrap();
                 let new_string = format!("{}\n{}", string, head_tokens);
                 file.write_all(new_string.as_bytes()).unwrap();
-                token_stream_iter.fold(quote! {}, |a, b| quote! {#a #b})
+                token_stream_iter.fold(quote! {#class_name_impl}, |a, b| quote! {#a #b})
             } else {
                 token_stream_iter.fold(
                     quote! {
+                        #class_name_impl
                         impl Apply<#name> for ::malvolio::prelude::Head {
                             fn apply(self, _: #name) -> ::malvolio::prelude::Head {
                                 self.child(StyleTag::new(#head_tokens))

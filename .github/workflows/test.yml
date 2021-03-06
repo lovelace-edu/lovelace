@@ -83,6 +83,16 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost/postgres
 
+  test-mercutio-no-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - run: (cd utils/mercutio_codegen && cargo test test_classes_to_file --features no_cache)
+
   test-malvolio-in-browser:
     runs-on: ubuntu-latest
     steps:
@@ -90,7 +100,7 @@ jobs:
       
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable 
+          toolchain: stable
           override: true
 
       - uses: actions/cache@v2
@@ -152,6 +162,8 @@ jobs:
       # tested seperately from everything else for speed
       - test-malvolio-in-browser
       - test-prospero
+      # if it caches it causes problems because the proc macro is not executed :(
+      - test-mercutio-no-cache
 
     runs-on: ubuntu-latest
 
@@ -161,4 +173,5 @@ jobs:
           [ ${{ needs.lint.result }} == success ] &&
           [ ${{ needs.test.result }} == success ] &&
           [ ${{ needs.test-prospero.result }} == success ] &&
+          [ ${{ needs.test-mercutio-no-cache.result }} == success ] &&
           [ ${{ needs.test-malvolio-in-browser.result }} == success ] || exit 1
