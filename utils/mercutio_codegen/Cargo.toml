@@ -19,3 +19,6 @@ syn = "1.0.60"
 trybuild = "1.0.41"
 mercutio = { path = "../mercutio" }
 malvolio = { path = "../malvolio" }
+
+[features]
+no_cache = []
