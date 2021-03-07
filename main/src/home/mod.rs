@@ -1,15 +1,9 @@
-use malvolio::{prelude::*, text::Text};
+use malvolio::prelude::*;
 use mercutio::{compose, Apply};
-use portia::{
-    colour::{GreyBackground, YellowBackground},
-    font::{SmallTitle, VerticalAlignCenter},
-    levels::{LayoutAxis, LayoutStrategy, Level, Spacing},
-    margin::ZeroMargin,
-    padding::DefaultPadding,
-};
+use portia::{colour::GreyBackground, levels::Level, padding::DefaultPadding, render::Render};
 use rocket::response::Redirect;
 
-use crate::{auth::OptionAuthCookie, utils::html_or_redirect::HtmlOrRedirect};
+use crate::{auth::OptionAuthCookie, ui::page::Page, utils::html_or_redirect::HtmlOrRedirect};
 
 #[get("/")]
 pub fn home(auth_cookie: OptionAuthCookie) -> HtmlOrRedirect {
@@ -17,34 +11,15 @@ pub fn home(auth_cookie: OptionAuthCookie) -> HtmlOrRedirect {
         HtmlOrRedirect::Redirect(Redirect::to("/dashboard"))
     } else {
         HtmlOrRedirect::Html(Html::default()
-        .head(
-            Head::default().child(
-                Meta::default()
-                    .attribute(MetaName::Charset)
-                    .attribute(Content::new("utf-8")),
-            ),
-        )
-        .body(
-            Body::new().apply(ZeroMargin)
-            .child(
-                Level::new()
-                    .child(
-                        Level::new().strategy(
-                                LayoutStrategy::new()
-                                    .axis(LayoutAxis::Horizontal)
-                                    .spacing(Spacing::Between)
-                            )
-                            .child(H1::new("Lovelace").apply(SmallTitle))
-                            .child(Div::new()
-                                .apply(VerticalAlignCenter)
-                                .attribute(Id::new("auth-bar"))
-                                .child(A::new().href("/auth/login").text("Login"))
-                                .child(Text::new(" "))
-                                .child(A::new().href("/auth/register").text("Register"))
-                            )
-                            .into_div()
-                            .apply(compose(YellowBackground, DefaultPadding))
-                    )
+            .head(
+                Head::default().child(
+                    Meta::default()
+                        .attribute(MetaName::Charset)
+                        .attribute(Content::new("utf-8")),
+                ),
+            )
+            .body(
+                Page::new()
                     .child(Level::new()
                         .child(P::with_text(
                             "IMPORTANT: This site is in very early stages. Please don't use this
@@ -68,7 +43,8 @@ pub fn home(auth_cookie: OptionAuthCookie) -> HtmlOrRedirect {
                         .into_div()
                         .apply(DefaultPadding)
                     )
-                )
-            ))
+                    .render()
+            )
+        )
     }
 }
