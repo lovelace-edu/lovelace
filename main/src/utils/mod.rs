@@ -17,6 +17,7 @@ use malvolio::prelude::{Body, Head, Html, Title, H1, P};
 use rocket::figment::{
     util::map,
     value::{Map, Value},
+    Figment,
 };
 use rocket::tokio::sync::RwLock;
 use rocket::{fairing::AdHoc, Rocket};
@@ -62,7 +63,13 @@ pub fn launch() -> Rocket {
         }
     }
 
-    let figment = rocket::Config::figment().merge(("databases", map!["postgres" => db]));
+    let figment = if let Ok(secret) = std::env::var("SECRET_KEY") {
+        Figment::from(rocket::Config::default())
+            .merge(("secret_key", secret.as_bytes()))
+            .merge(("databases", map!["postgres" => db]))
+    } else {
+        Figment::from(rocket::Config::default()).merge(("databases", map!["postgres" => db]))
+    };
     rocket::custom(figment)
         .manage(StateValues {
             map: RwLock::new(HashMap::new()),
