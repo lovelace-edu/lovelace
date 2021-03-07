@@ -65,6 +65,14 @@ pub fn launch() -> Rocket {
 
     let figment = if let Ok(secret) = std::env::var("SECRET_KEY") {
         Figment::from(rocket::Config::default())
+            .merge((
+                "port",
+                std::env::var("PORT")
+                    .unwrap_or_else(|_| "8000".to_string())
+                    .as_str()
+                    .parse::<u16>()
+                    .expect("invalid port supplied"),
+            ))
             .merge(("secret_key", secret.as_bytes()))
             .merge(("databases", map!["postgres" => db]))
     } else {
