@@ -7,3 +7,7 @@
 )]
 /// A small title.
 pub struct SmallTitle;
+
+#[derive(CSS, Debug)]
+#[mercutio(elements(Div), css(vertical_align = "center"))]
+pub struct VerticalAlignCenter;

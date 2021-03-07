@@ -66,6 +66,8 @@ pub struct Elements {
     input: bool,
     #[darling(rename = "Body")]
     body: bool,
+    #[darling(rename = "A")]
+    a: bool,
 }
 
 impl From<Elements> for Vec<String> {
@@ -101,6 +103,9 @@ impl From<Elements> for Vec<String> {
         if elements.body {
             res.push("Body");
         }
+        if elements.a {
+            res.push("A");
+        }
         res.into_iter().map(From::from).collect()
     }
 }
@@ -108,6 +113,7 @@ impl From<Elements> for Vec<String> {
 #[derive(Default, FromMeta)]
 #[darling(default)]
 pub struct CssPropsInner {
+    justify_content: Option<String>,
     binding: Option<String>,
     width: Option<String>,
     list_style_image: Option<String>,
@@ -342,6 +348,11 @@ struct CssPropsInnerStyleOutputter<'a>(pub &'a CssPropsInner);
 
 impl<'a> std::fmt::Display for CssPropsInnerStyleOutputter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = &self.0.justify_content {
+            f.write_str("justify-content:")?;
+            f.write_str(&value)?;
+            f.write_str(";")?;
+        }
         if let Some(value) = &self.0.binding {
             f.write_str("binding:")?;
             f.write_str(&value)?;
@@ -1047,6 +1058,11 @@ impl<'a> std::fmt::Display for CssPropsInnerCssOutputter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("{")?;
 
+        if let Some(value) = &self.0.justify_content {
+            f.write_str("value:")?;
+            f.write_str(&value)?;
+            f.write_str(";")?;
+        }
         if let Some(value) = &self.0.binding {
             f.write_str("binding:")?;
             f.write_str(&value)?;
