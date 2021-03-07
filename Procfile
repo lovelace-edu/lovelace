@@ -1,1 +1,1 @@
-web: ROCKET_PORT=$PORT ROCKET_KEEP_ALIVE=0 ./target/release/main
+web: ROCKET_PORT=$PORT ROCKET_SECRET_KEY=$SECRET_KEY ./target/release/main

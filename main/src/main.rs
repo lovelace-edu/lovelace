@@ -24,10 +24,9 @@ extern crate nanoid;
 extern crate derive_builder;
 #[macro_use]
 extern crate cfg_if;
+#[macro_use]
+extern crate derivative;
 extern crate jsonwebtoken as jwt;
-
-use rocket::Rocket;
-use utils::launch;
 
 mod auth;
 mod calendar;
@@ -40,9 +39,10 @@ mod institution;
 mod models;
 mod notifications;
 mod schema;
+mod ui;
 mod utils;
 
 #[rocket::launch]
-fn rocket() -> Rocket {
-    launch()
+fn launch() -> rocket::Rocket {
+    crate::utils::launch()
 }
