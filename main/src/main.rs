@@ -35,8 +35,6 @@ use portia::{
     margin::ZeroMargin,
     padding::DefaultPadding,
 };
-use rocket::Rocket;
-use utils::launch;
 
 mod auth;
 mod calendar;
@@ -94,7 +92,8 @@ fn index() -> Html {
             )
 }
 
-#[rocket::launch]
-fn rocket() -> Rocket {
-    launch()
+#[tokio::main]
+
+async fn main() {
+    crate::utils::launch().launch().await.unwrap();
 }

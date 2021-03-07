@@ -8,6 +8,3 @@ members = [
     "main",
 ]
 default-members = ["main"]
-
-[profile.release]
-lto = true
