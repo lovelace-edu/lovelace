@@ -71,6 +71,7 @@ impl A {
         self.text = clean(&text.into()).into();
         self
     }
+
     /// Adds the supplied text to this node, overwriting the previously existing text (if text has
     /// already been added to the node).
     ///
@@ -84,6 +85,7 @@ impl A {
         self.text = text.into();
         self
     }
+
     /// Adds an attribute to this node. This method takes one argument which must implement
     /// `Into<AAttr>`.
     pub fn attribute<I>(mut self, attribute: I) -> Self
@@ -94,10 +96,50 @@ impl A {
         self.attrs.insert(res.0, res.1);
         self
     }
+
+    /// Attach a new `href` attribute to this tag.
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// A::new().href("http://example.com");
+    /// ```
+    ///
+    /// Note: this method is a shortcut for
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// A::new().attribute(Href::new("https://example.com"));
+    /// ```
+    pub fn href<C>(self, href: C) -> Self
+    where
+        C: Into<Cow<'static, str>>,
+    {
+        self.attribute(Href::new(href))
+    }
+
+    /// Attach a new `id` attribute to this tag.
+    ///
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// A::new().id("some-id");
+    /// ```
+    ///
+    /// Note: this method is a shortcut for
+    /// ```rust
+    /// # use malvolio::prelude::*;
+    /// A::new().attribute(Id::new("some-id"));
+    /// ```
+    pub fn id<C>(self, id: C) -> Self
+    where
+        C: Into<Cow<'static, str>>,
+    {
+        self.attribute(Id::new(id))
+    }
+
     /// Read an attribute that has been set.
     pub fn read_attribute(&self, attribute: &'static str) -> Option<&Cow<'static, str>> {
         self.attrs.get(attribute)
     }
+
     #[cfg(feature = "with_yew")]
     #[cfg(not(tarpaulin))]
     /// Attaches a listener to this item. Only available if the `with_yew` feature is enabled.
