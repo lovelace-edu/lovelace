@@ -119,11 +119,13 @@ impl A {
     /// Attach a new `id` attribute to this tag.
     ///
     /// ```rust
+    /// # use malvolio::prelude::*;
     /// A::new().id("some-id");
     /// ```
     ///
     /// Note: this method is a shortcut for
     /// ```rust
+    /// # use malvolio::prelude::*;
     /// A::new().attribute(Id::new("some-id"));
     /// ```
     pub fn id<C>(self, id: C) -> Self
