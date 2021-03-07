@@ -94,7 +94,7 @@ pub fn launch() -> Rocket {
         .mount(
             "/",
             routes![
-                crate::index,
+                crate::home::home,
                 crate::class::html_create_class,
                 crate::class::create_class_page,
                 crate::class::html_join_class,

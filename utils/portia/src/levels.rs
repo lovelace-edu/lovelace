@@ -24,6 +24,14 @@ pub struct Level {
 }
 
 impl Level {
+    /// Specify the strategy for this level.
+    pub fn strategy<L>(mut self, strategy: L) -> Self
+    where
+        L: Into<LayoutStrategy>,
+    {
+        self.layout_strategy = Some(strategy.into());
+        self
+    }
     pub fn child<B>(mut self, child: B) -> Self
     where
         B: IntoLevelChild,
@@ -62,8 +70,25 @@ impl From<Level> for Div {
         };
         Div::new()
             .map(|div| match layout_strategy.axis {
-                LayoutAxis::Horizontal => div.apply(compose(FlexDirectionRow, DisplayFlex)),
-                LayoutAxis::Vertical => div.apply(compose(FlexDirectionColumn, DisplayFlex)),
+                LayoutAxis::Horizontal => match layout_strategy.spacing {
+                    Spacing::Between => div.apply(compose(
+                        compose(FlexDirectionRow, DisplayFlex),
+                        SpaceBetween,
+                    )),
+                    Spacing::Fill => {
+                        div.apply(compose(compose(FlexDirectionRow, DisplayFlex), SpaceAround))
+                    }
+                },
+                LayoutAxis::Vertical => match layout_strategy.spacing {
+                    Spacing::Between => div.apply(compose(
+                        compose(FlexDirectionColumn, DisplayFlex),
+                        SpaceBetween,
+                    )),
+                    Spacing::Fill => div.apply(compose(
+                        compose(FlexDirectionColumn, DisplayFlex),
+                        SpaceAround,
+                    )),
+                },
             })
             .children(item.children.into_iter().map(|child| child.item))
     }
@@ -88,26 +113,56 @@ struct FlexDirectionRow;
 #[mercutio(css(flex_direction = "column"), elements(Div))]
 struct FlexDirectionColumn;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(CSS)]
+#[mercutio(css(justify_content = "space-between"), elements(Div))]
+struct SpaceBetween;
+
+#[derive(CSS)]
+#[mercutio(css(justify_content = "space-around"), elements(Div))]
+struct SpaceAround;
+
+#[derive(Copy, Clone, Debug, Derivative)]
+#[derivative(Default(new = "true"))]
 /// How to display the items – `Horizontal` means that items are laid out across a number of columns,
 /// while `Vertical` means that they will be laid out in a number of rows (each item is below the
 /// previous one).
 pub enum LayoutAxis {
+    #[derivative(Default)]
     Horizontal,
     Vertical,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Derivative)]
+#[derivative(Default(new = "true"))]
 pub enum Spacing {
+    #[derivative(Default)]
     Between,
     Fill,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Derivative)]
+#[derivative(Default(new = "true"))]
 /// Determines how to display the children of this level of the layout heirarchy.
 pub struct LayoutStrategy {
     axis: LayoutAxis,
     spacing: Spacing,
+}
+
+impl LayoutStrategy {
+    pub fn axis<A>(mut self, axis: A) -> Self
+    where
+        A: Into<LayoutAxis>,
+    {
+        self.axis = axis.into();
+        self
+    }
+    pub fn spacing<S>(mut self, spacing: S) -> Self
+    where
+        S: Into<Spacing>,
+    {
+        self.spacing = spacing.into();
+        self
+    }
 }
 
 #[derive(Clone, Debug)]
