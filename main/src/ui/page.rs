@@ -1,5 +1,6 @@
 use malvolio::prelude::*;
-use portia::render::Render;
+use mercutio::Apply;
+use portia::{margin::ZeroMargin, render::Render};
 
 use super::navbar::Navbar;
 
@@ -31,6 +32,7 @@ impl Page {
 impl Render<Body> for Page {
     fn render(self) -> Body {
         Body::new()
+            .apply(ZeroMargin)
             .child(Render::<Div>::render(Navbar))
             .children(self.children)
     }

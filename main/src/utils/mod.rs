@@ -73,7 +73,7 @@ pub fn launch() -> Rocket {
                     .parse::<u16>()
                     .expect("invalid port supplied"),
             ))
-            .merge(("secret_key", secret.as_bytes()))
+            .merge(("secret_key", secret.as_str()))
             .merge(("databases", map!["postgres" => db]))
     } else {
         Figment::from(rocket::Config::default()).merge(("databases", map!["postgres" => db]))
